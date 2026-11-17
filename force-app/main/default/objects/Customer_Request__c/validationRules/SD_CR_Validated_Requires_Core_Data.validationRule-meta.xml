@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SD_CR_Validated_Requires_Core_Data</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISPICKVAL(Validation_Status__c, &quot;Validated&quot;),
+    OR(
+        ISBLANK(Requested_Product__c),
+        ISBLANK(Requested_Quantity__c),
+        Requested_Quantity__c &lt;= 0,
+        ISBLANK(Delivery_City__c),
+        ISBLANK(Requested_Date__c),
+        ISBLANK(Opportunity__c)
+    )
+)</errorConditionFormula>
+    <errorMessage>A validated request must contain a product, positive quantity,
+delivery city, requested date and opportunity.</errorMessage>
+</ValidationRule>

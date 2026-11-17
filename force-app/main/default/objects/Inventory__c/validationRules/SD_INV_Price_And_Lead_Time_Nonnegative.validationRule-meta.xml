@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SD_INV_Price_And_Lead_Time_Nonnegative</fullName>
+    <active>true</active>
+    <errorConditionFormula>OR(
+    Unit_Price__c &lt; 0,
+    Lead_Time_Days__c &lt; 0
+)</errorConditionFormula>
+    <errorMessage>Unit price and lead time cannot be negative.</errorMessage>
+</ValidationRule>

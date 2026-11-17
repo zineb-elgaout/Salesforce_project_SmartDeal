@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Resolution_Notes_Required</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(OR(ISPICKVAL(Status__c,&quot;Resolved&quot;),
+ISPICKVAL(Status__c,&quot;Closed&quot;)),
+ISBLANK(Resolution_Notes__c))</errorConditionFormula>
+    <errorDisplayField>Resolution_Notes__c</errorDisplayField>
+    <errorMessage>Merci de renseigner les Resolution Notes avant
+de résoudre ou fermer la demande.</errorMessage>
+</ValidationRule>

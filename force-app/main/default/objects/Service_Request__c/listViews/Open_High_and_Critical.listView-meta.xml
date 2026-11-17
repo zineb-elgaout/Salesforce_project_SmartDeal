@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Open_High_and_Critical</fullName>
+    <columns>NAME</columns>
+    <columns>Subject__c</columns>
+    <columns>Status__c</columns>
+    <columns>Priority__c</columns>
+    <columns>Category__c</columns>
+    <columns>Customer__c</columns>
+    <columns>Assigned_To__c</columns>
+    <filterScope>Mine</filterScope>
+    <filters>
+        <field>Priority__c</field>
+        <operation>equals</operation>
+    </filters>
+    <filters>
+        <field>Status__c</field>
+        <operation>notEqual</operation>
+    </filters>
+    <label>Open High and Critical</label>
+</ListView>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SD_CR_Quantity_Must_Be_Positive</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    NOT(ISBLANK(Requested_Quantity__c)),
+    Requested_Quantity__c &lt;= 0
+)</errorConditionFormula>
+    <errorMessage>Requested quantity must be greater than zero.</errorMessage>
+</ValidationRule>

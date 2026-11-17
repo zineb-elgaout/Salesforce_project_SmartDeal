@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SD_CR_Date_Cannot_Be_In_Past</fullName>
+    <active>true</active>
+    <errorConditionFormula>AND(
+    ISCHANGED(Requested_Date__c),
+    NOT(ISBLANK(Requested_Date__c)),
+    Requested_Date__c &lt; TODAY()
+)</errorConditionFormula>
+    <errorMessage>Requested date cannot be in the past.</errorMessage>
+</ValidationRule>
