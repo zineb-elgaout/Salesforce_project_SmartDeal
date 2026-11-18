@@ -9,6 +9,7 @@ public with sharing class ServiceRequestService {
             FROM Service_Request__c
             WHERE Priority__c = :priority
               AND Status__c NOT IN :CLOSED_STATUSES
+            WITH USER_MODE
             ORDER BY CreatedDate DESC
             LIMIT 50
         ];
@@ -19,6 +20,7 @@ public with sharing class ServiceRequestService {
         for (AggregateResult ar : [
             SELECT Status__c statusValue, COUNT(Id) total
             FROM Service_Request__c
+            WITH USER_MODE
             GROUP BY Status__c
         ]) {
             result.put((String) ar.get('statusValue'), (Integer) ar.get('total'));
@@ -34,6 +36,7 @@ public with sharing class ServiceRequestService {
             SELECT Id, Status__c, Assigned_To__c
             FROM Service_Request__c
             WHERE Id = :requestId
+            WITH USER_MODE
             LIMIT 1
         ];
         if (found.isEmpty()) {
@@ -44,7 +47,10 @@ public with sharing class ServiceRequestService {
         if (sr.Status__c == 'New') {
             sr.Status__c = 'In Progress';
         }
-        update sr;
+        Database.SaveResult saved = Database.update(sr, AccessLevel.USER_MODE);
+        if (!saved.isSuccess()) {
+            throw new ServiceRequestException(saved.getErrors()[0].getMessage());
+        }
         return sr;
     }
     // 4. Escalader les demandes ouvertes Low/Medium plus vieilles que daysOld jours
@@ -56,12 +62,13 @@ public with sharing class ServiceRequestService {
             WHERE Status__c NOT IN :CLOSED_STATUSES
               AND Priority__c IN ('Low', 'Medium')
               AND CreatedDate < :threshold
+            WITH USER_MODE
         ];
         for (Service_Request__c sr : stale) {
             sr.Priority__c = (sr.Priority__c == 'Low') ? 'Medium' : 'High';
         }
         if (!stale.isEmpty()) {
-            update stale;          // un seul DML pour toute la liste (bonne pratique)
+            Database.update(stale, AccessLevel.USER_MODE);
         }
         return stale.size();
     }
@@ -71,6 +78,7 @@ public with sharing class ServiceRequestService {
         SELECT Id, Name, Subject__c, Priority__c, Status__c
         FROM Service_Request__c
         WHERE Customer__c = :contactId
+        WITH USER_MODE
         ORDER BY CreatedDate DESC
     ];
 }

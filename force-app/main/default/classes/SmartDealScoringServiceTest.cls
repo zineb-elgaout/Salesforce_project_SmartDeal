@@ -23,6 +23,10 @@
 private class SmartDealScoringServiceTest {
     @IsTest
     static void calculatesExpectedScore() {
+        SmartDealScoringService.configurationOverride = new SmartDeal_Weight__mdt(
+            Availability_Weight__c=0.30, Service_Weight__c=0.25, Margin_Weight__c=0.20,
+            Eco_Weight__c=0.15, Priority_Weight__c=0.10, Version__c='test-v1'
+        );
         SmartDealScoringService.Factors f =
             new SmartDealScoringService.Factors();
         f.availability = 100;
@@ -38,7 +42,28 @@ private class SmartDealScoringServiceTest {
         Test.stopTest();
         System.assertEquals(1, results.size());
         System.assertEquals(83.50, results[0].score);
+        System.assert(String.isNotBlank(results[0].version));
         System.assert(results[0].explanation.contains('Availability'));
+    }
+    @IsTest
+    static void usesConfiguredWeightsAndVersion() {
+        SmartDealScoringService.configurationOverride = new SmartDeal_Weight__mdt(
+            Availability_Weight__c=1, Service_Weight__c=0, Margin_Weight__c=0,
+            Eco_Weight__c=0, Priority_Weight__c=0, Version__c='test-v2'
+        );
+        SmartDealScoringService.Factors f = new SmartDealScoringService.Factors();
+        f.availability = 100;
+        f.service = 0;
+        f.margin = 0;
+        f.eco = 0;
+        f.priority = 0;
+        List<SmartDealScoringService.Result> results =
+            SmartDealScoringService.calculate(
+                new List<SmartDealScoringService.Factors>{ f }
+            );
+        System.assertEquals(100, results[0].score);
+        System.assertEquals('test-v2', results[0].version);
+        System.assert(results[0].explanation.contains('Availability 100%'));
     }
     @IsTest
     static void clampsInvalidValues() {
