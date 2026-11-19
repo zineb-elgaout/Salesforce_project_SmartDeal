@@ -1,0 +1,193 @@
+<template>
+    <div class="cockpit">
+        <header class="cockpit-header">
+            <div>
+                <p class="eyebrow">SmartDeal Impact</p>
+                <h1>Order Rescue Cockpit</h1>
+                <p class="subtitle">
+                    Priorisation des demandes, scénarios de sauvetage et décisions humaines.
+                </p>
+            </div>
+            <div class="header-actions">
+                <span class="demo-badge">Mode démo</span>
+                <lightning-button
+                    label="Rafraîchir"
+                    icon-name="utility:refresh"
+                    onclick={handleRefresh}
+                    disabled={isRefreshing}
+                ></lightning-button>
+            </div>
+        </header>
+
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Chargement du cockpit" size="medium"></lightning-spinner>
+        </template>
+
+        <template if:true={hasError}>
+            <div class="error-panel">
+                <lightning-icon icon-name="utility:error" size="small" variant="error"></lightning-icon>
+                <span>{error}</span>
+            </div>
+        </template>
+
+        <section class="kpi-grid">
+            <article class="kpi kpi-blue">
+                <span class="kpi-label">Demandes à valider</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.requestsToValidate}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Needs Review + Ready for Validation</span>
+            </article>
+            <article class="kpi kpi-amber">
+                <span class="kpi-label">Opportunités à risque</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.opportunitiesAtRisk}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Faisabilité At Risk</span>
+            </article>
+            <article class="kpi kpi-violet">
+                <span class="kpi-label">Scénarios à décider</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.scenariosToDecide}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Données fraîches, non sélectionnés</span>
+            </article>
+            <article class="kpi kpi-green">
+                <span class="kpi-label">Scénarios sélectionnés</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.scenariosSelected}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Taux affiché : {selectedRateLabel}</span>
+            </article>
+            <article class="kpi kpi-teal">
+                <span class="kpi-label">Service ouvert</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.serviceOpen}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Demandes non résolues</span>
+            </article>
+            <article class="kpi kpi-red">
+                <span class="kpi-label">En retard SLA</span>
+                <strong class="kpi-value">
+                    <lightning-formatted-number value={counts.serviceOverdue}></lightning-formatted-number>
+                </strong>
+                <span class="kpi-hint">Is Overdue = true</span>
+            </article>
+        </section>
+
+        <div class="slds-grid slds-wrap slds-gutters main-grid">
+            <section class="slds-col slds-size_2-of-3">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>File de travail priorisée</h2>
+                            <p>Les opportunités à risque apparaissent en premier.</p>
+                        </div>
+                        <lightning-button
+                            label="Toutes les demandes"
+                            variant="neutral"
+                            onclick={handleOpenRequests}
+                        ></lightning-button>
+                    </div>
+
+                    <template if:true={hasWorkQueue}>
+                        <lightning-datatable
+                            key-field="requestId"
+                            data={workQueue}
+                            columns={requestColumns}
+                            hide-checkbox-column
+                            onrowaction={handleRowAction}
+                        ></lightning-datatable>
+                    </template>
+                    <template if:false={hasWorkQueue}>
+                        <div class="empty-state">
+                            <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                            <span>Aucune demande dans la file. Lance le script de préparation de démo.</span>
+                        </div>
+                    </template>
+                </article>
+            </section>
+
+            <aside class="slds-col slds-size_1-of-3">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Décisions récentes</h2>
+                            <p>Les derniers scénarios sélectionnés.</p>
+                        </div>
+                    </div>
+
+                    <template if:true={hasDecisions}>
+                        <ul class="decision-list">
+                            <template for:each={recentDecisions} for:item="decision">
+                                <li class="decision-item" key={decision.scenarioId}>
+                                    <div class="decision-main">
+                                        <strong>{decision.scenarioName}</strong>
+                                        <span>{decision.opportunityName}</span>
+                                    </div>
+                                    <div class="decision-meta">
+                                        <span class="score-pill">
+                                            Score&nbsp;
+                                            <lightning-formatted-number
+                                                value={decision.score}
+                                                maximum-fraction-digits="1"
+                                            ></lightning-formatted-number>
+                                        </span>
+                                        <span>{decision.decisionBy}</span>
+                                        <lightning-formatted-date-time
+                                            value={decision.decisionDate}
+                                            year="numeric"
+                                            month="2-digit"
+                                            day="2-digit"
+                                            hour="2-digit"
+                                            minute="2-digit"
+                                        ></lightning-formatted-date-time>
+                                    </div>
+                                    <lightning-button
+                                        label="Ouvrir"
+                                        variant="base"
+                                        data-id={decision.opportunityId}
+                                        onclick={handleDecisionOpen}
+                                    ></lightning-button>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                    <template if:false={hasDecisions}>
+                        <div class="empty-state">
+                            <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                            <span>Aucune décision enregistrée pour le moment.</span>
+                        </div>
+                    </template>
+                </article>
+
+                <article class="panel panel-compact">
+                    <h2>Accès rapides</h2>
+                    <div class="quick-actions">
+                        <lightning-button
+                            label="Opportunités"
+                            icon-name="utility:opportunity"
+                            onclick={handleOpenOpportunities}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Scénarios"
+                            icon-name="utility:list"
+                            onclick={handleOpenScenarios}
+                        ></lightning-button>
+                    </div>
+                </article>
+
+                <article class="panel panel-guide">
+                    <h2>Parcours de démonstration</h2>
+                    <ol class="guide-list">
+                        <li><span>1</span> Valider une demande client.</li>
+                        <li><span>2</span> Montrer le contrôle stock et les scénarios.</li>
+                        <li><span>3</span> Faire classer les scénarios par Agentforce.</li>
+                        <li><span>4</span> Sélectionner un scénario et expliquer la décision.</li>
+                        <li><span>5</span> Montrer les KPI et le reporting.</li>
+                    </ol>
+                </article>
+            </aside>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,207 @@
+<template>
+    <div class="workspace">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Chargement de la demande" size="medium"></lightning-spinner>
+        </template>
+
+        <template if:true={hasError}>
+            <div class="error-panel">
+                <lightning-icon icon-name="utility:error" size="small" variant="error"></lightning-icon>
+                <span>{error}</span>
+            </div>
+        </template>
+
+        <template if:true={request}>
+            <header class="request-header">
+                <div class="request-title">
+                    <p class="eyebrow">Demande client</p>
+                    <h1>{request.name}</h1>
+                    <p>
+                        {request.customerName} · {request.productName}
+                        <template if:true={request.productCode}>
+                            <span class="muted">({request.productCode})</span>
+                        </template>
+                    </p>
+                </div>
+                <div class="header-badges">
+                    <span class="badge badge-neutral">{request.validationStatus}</span>
+                    <span class={feasibilityClass}>{request.feasibilityStatus}</span>
+                    <span class={inventoryClass}>{inventoryLabel}</span>
+                </div>
+            </header>
+
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span>Quantité demandée</span>
+                    <strong>
+                        <lightning-formatted-number
+                            value={request.quantity}
+                            maximum-fraction-digits="0"
+                        ></lightning-formatted-number>
+                    </strong>
+                </div>
+                <div class="summary-item">
+                    <span>Ville de livraison</span>
+                    <strong>{request.city}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Date souhaitée</span>
+                    <strong>
+                        <lightning-formatted-date-time
+                            value={request.requestedDate}
+                            year="numeric"
+                            month="2-digit"
+                            day="2-digit"
+                        ></lightning-formatted-date-time>
+                    </strong>
+                </div>
+                <div class="summary-item">
+                    <span>Budget</span>
+                    <strong>
+                        <lightning-formatted-number
+                            value={request.budget}
+                            format-style="currency"
+                            currency-code="MAD"
+                            currency-display-as="symbol"
+                        ></lightning-formatted-number>
+                    </strong>
+                </div>
+                <div class="summary-item">
+                    <span>Canal</span>
+                    <strong>{request.channel}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Consentement</span>
+                    <strong>{request.consentStatus}</strong>
+                </div>
+            </div>
+
+            <div class="slds-grid slds-wrap slds-gutters">
+                <section class="slds-col slds-size_1-of-2">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Checklist de validation</h2>
+                                <p>Contrôles réalisés avant le passage en Validated.</p>
+                            </div>
+                            <span class="badge badge-neutral">
+                                {request.validationStatus}
+                            </span>
+                        </div>
+
+                        <ul class="checklist">
+                            <template for:each={checklist} for:item="item">
+                                <li key={item.label}>
+                                    <template if:true={item.complete}>
+                                        <lightning-icon
+                                            icon-name="utility:check"
+                                            size="x-small"
+                                            variant="success"
+                                        ></lightning-icon>
+                                    </template>
+                                    <template if:false={item.complete}>
+                                        <lightning-icon
+                                            icon-name="utility:close"
+                                            size="x-small"
+                                            variant="error"
+                                        ></lightning-icon>
+                                    </template>
+                                    <span>{item.label}</span>
+                                    <small>{item.detail}</small>
+                                </li>
+                            </template>
+                        </ul>
+
+                        <template if:true={hasMissingInformation}>
+                            <div class="warning-panel">
+                                <strong>Informations manquantes</strong>
+                                <p>{request.missingInformation}</p>
+                            </div>
+                        </template>
+
+                        <template if:true={request.originalMessage}>
+                            <div class="message-panel">
+                                <strong>Message d’origine</strong>
+                                <p>{request.originalMessage}</p>
+                            </div>
+                        </template>
+                    </article>
+                </section>
+
+                <section class="slds-col slds-size_1-of-2">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Contrôle de faisabilité</h2>
+                                <p>Lecture seule. Aucune réservation ni commande n’est créée.</p>
+                            </div>
+                            <span class={inventoryClass}>{inventoryLabel}</span>
+                        </div>
+
+                        <template if:true={inventory}>
+                            <p class="inventory-message">{inventory.message}</p>
+                        </template>
+
+                        <template if:true={hasWarehouses}>
+                            <lightning-datatable
+                                key-field="warehouseCode"
+                                data={warehouses}
+                                columns={warehouseColumns}
+                                hide-checkbox-column
+                            ></lightning-datatable>
+                        </template>
+                        <template if:false={hasWarehouses}>
+                            <div class="empty-state">
+                                <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                                <span>Aucune ligne de stock retournée pour ce produit.</span>
+                            </div>
+                        </template>
+                    </article>
+                </section>
+            </div>
+
+            <footer class="action-bar">
+                <div class="action-left">
+                    <template if:true={canValidate}>
+                        <lightning-button
+                            label="Valider la demande"
+                            variant="brand"
+                            icon-name="utility:check"
+                            onclick={handleValidate}
+                            disabled={isWorking}
+                        ></lightning-button>
+                    </template>
+                    <template if:true={isValidated}>
+                        <span class="validated-label">
+                            <lightning-icon
+                                icon-name="utility:success"
+                                size="x-small"
+                                variant="success"
+                            ></lightning-icon>
+                            Demande validée
+                        </span>
+                    </template>
+                    <lightning-button
+                        label="Modifier"
+                        variant="neutral"
+                        icon-name="utility:edit"
+                        onclick={handleEdit}
+                    ></lightning-button>
+                    <lightning-button
+                        label="Rafraîchir"
+                        variant="neutral"
+                        icon-name="utility:refresh"
+                        onclick={handleRefresh}
+                        disabled={isWorking}
+                    ></lightning-button>
+                </div>
+                <lightning-button
+                    label="Voir l’opportunité"
+                    variant="brand-outline"
+                    icon-name="utility:opportunity"
+                    onclick={handleOpenOpportunity}
+                ></lightning-button>
+            </footer>
+        </template>
+    </div>
+</template>

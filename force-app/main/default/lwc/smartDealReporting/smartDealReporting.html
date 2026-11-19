@@ -1,0 +1,189 @@
+<template>
+    <div class="reporting">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Chargement du reporting" size="medium"></lightning-spinner>
+        </template>
+
+        <template if:true={hasError}>
+            <div class="error-panel">
+                <lightning-icon icon-name="utility:error" size="small" variant="error"></lightning-icon>
+                <span>{error}</span>
+            </div>
+        </template>
+
+        <template if:true={hasData}>
+            <header class="reporting-header">
+                <div>
+                    <p class="eyebrow">Pilotage · SmartDeal Impact</p>
+                    <h1>Reporting opérationnel</h1>
+                    <p>
+                        Vue synthétique des demandes, opportunités, scénarios et opérations service.
+                    </p>
+                </div>
+                <lightning-button
+                    label="Rafraîchir"
+                    variant="neutral"
+                    icon-name="utility:refresh"
+                    onclick={handleRefresh}
+                    disabled={isRefreshing}
+                ></lightning-button>
+            </header>
+
+            <section class="kpi-grid">
+                <template for:each={kpis} for:item="kpi">
+                    <article class={kpi.cardClass} key={kpi.key}>
+                        <span class="kpi-label">{kpi.label}</span>
+                        <strong class="kpi-value">
+                            <lightning-formatted-number
+                                value={kpi.value}
+                                maximum-fraction-digits="1"
+                            ></lightning-formatted-number>
+                        </strong>
+                        <span class="kpi-detail">{kpi.detail}</span>
+                        <template if:true={kpi.hasRate}>
+                            <div class="kpi-rate">
+                                <lightning-progress-bar value={kpi.rate} size="small"></lightning-progress-bar>
+                                <span>
+                                    <lightning-formatted-number
+                                        value={kpi.rate}
+                                        maximum-fraction-digits="1"
+                                    ></lightning-formatted-number>
+                                    %
+                                </span>
+                            </div>
+                        </template>
+                    </article>
+                </template>
+            </section>
+
+            <div class="slds-grid slds-wrap slds-gutters">
+                <section class="slds-col slds-size_2-of-3">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Funnel de traitement</h2>
+                                <p>De la demande initiale à la décision de sauvetage.</p>
+                            </div>
+                            <span class="badge">Volume</span>
+                        </div>
+
+                        <template if:true={hasFunnel}>
+                            <div class="funnel">
+                                <template for:each={funnel} for:item="step">
+                                    <div class="funnel-row" key={step.label}>
+                                        <div class="funnel-label">
+                                            <span>{step.label}</span>
+                                            <strong>{step.value}</strong>
+                                        </div>
+                                        <lightning-progress-bar
+                                            value={step.percent}
+                                            size="small"
+                                            variant="success"
+                                        ></lightning-progress-bar>
+                                        <small>{step.percent} % du volume de demandes</small>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={hasFunnel}>
+                            <div class="empty-state">Aucune donnée de funnel disponible.</div>
+                        </template>
+                    </article>
+
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Répartition des scénarios</h2>
+                                <p>Types de scénarios générés par Flow 2.</p>
+                            </div>
+                            <span class="badge">Scénarios</span>
+                        </div>
+
+                        <template if:true={hasScenarioTypes}>
+                            <div class="breakdown">
+                                <template for:each={scenarioTypes} for:item="item">
+                                    <div class="breakdown-row" key={item.label}>
+                                        <div class="breakdown-label">
+                                            <span>{item.label}</span>
+                                            <strong>{item.value}</strong>
+                                        </div>
+                                        <lightning-progress-bar value={item.percent} size="small"></lightning-progress-bar>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={hasScenarioTypes}>
+                            <div class="empty-state">Aucun scénario généré pour le moment.</div>
+                        </template>
+                    </article>
+                </section>
+
+                <section class="slds-col slds-size_1-of-3">
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Priorités service</h2>
+                                <p>Demandes ouvertes par priorité.</p>
+                            </div>
+                        </div>
+
+                        <template if:true={hasServicePriorities}>
+                            <div class="breakdown">
+                                <template for:each={servicePriorities} for:item="item">
+                                    <div class="breakdown-row" key={item.label}>
+                                        <div class="breakdown-label">
+                                            <span>{item.label}</span>
+                                            <strong>{item.value}</strong>
+                                        </div>
+                                        <lightning-progress-bar value={item.percent} size="small" variant="warning"></lightning-progress-bar>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template if:false={hasServicePriorities}>
+                            <div class="empty-state">Aucune demande service ouverte.</div>
+                        </template>
+                    </article>
+
+                    <article class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Accès rapides</h2>
+                                <p>Listes opérationnelles pour la démo.</p>
+                            </div>
+                        </div>
+                        <div class="quick-links">
+                            <lightning-button
+                                label="Demandes"
+                                icon-name="utility:case"
+                                onclick={handleOpenRequests}
+                            ></lightning-button>
+                            <lightning-button
+                                label="Opportunités"
+                                icon-name="utility:opportunity"
+                                onclick={handleOpenOpportunities}
+                            ></lightning-button>
+                            <lightning-button
+                                label="Scénarios"
+                                icon-name="utility:steps"
+                                onclick={handleOpenScenarios}
+                            ></lightning-button>
+                            <lightning-button
+                                label="Service"
+                                icon-name="utility:service_appointment"
+                                onclick={handleOpenService}
+                            ></lightning-button>
+                        </div>
+                        <p class="hint">
+                            Pour les graphiques avancés, utilise les rapports et dashboards standard Salesforce.
+                        </p>
+                    </article>
+                </section>
+            </div>
+
+            <footer class="reporting-footer">
+                Les données sont calculées en temps réel avec les droits de l’utilisateur connecté.
+            </footer>
+        </template>
+    </div>
+</template>

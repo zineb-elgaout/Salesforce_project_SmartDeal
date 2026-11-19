@@ -1,0 +1,307 @@
+<template>
+    <div class="board">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Chargement des scénarios" size="medium"></lightning-spinner>
+        </template>
+        <template if:true={isWorking}>
+            <lightning-spinner alternative-text="Enregistrement" size="small"></lightning-spinner>
+        </template>
+
+        <template if:true={hasError}>
+            <div class="error-panel">
+                <lightning-icon icon-name="utility:error" size="small" variant="error"></lightning-icon>
+                <span>{error}</span>
+            </div>
+        </template>
+
+        <template if:true={opportunity}>
+            <header class="board-header">
+                <div>
+                    <p class="eyebrow">Opportunité · SmartDeal Order Rescue</p>
+                    <h1>{opportunity.name}</h1>
+                    <p class="subtitle">
+                        {opportunity.accountName} · {opportunity.stageName} · Owner {opportunity.ownerName}
+                    </p>
+                </div>
+                <div class="header-badges">
+                    <span class={feasibilityClass}>{opportunity.feasibilityStatus}</span>
+                    <span class="badge badge-neutral">
+                        {selectedCount} sélectionné(s)
+                    </span>
+                </div>
+            </header>
+
+            <div class="toolbar">
+                <div class="toolbar-meta">
+                    <span>Montant&nbsp;</span>
+                    <strong>
+                        <lightning-formatted-number
+                            value={opportunity.amount}
+                            format-style="currency"
+                            currency-code="MAD"
+                            currency-display-as="symbol"
+                        ></lightning-formatted-number>
+                    </strong>
+                    <span class="divider">·</span>
+                    <span>Rescue required&nbsp;</span>
+                    <strong>{opportunity.rescueRequired}</strong>
+                </div>
+                <div class="toolbar-actions">
+                    <lightning-button
+                        label="Voir la demande"
+                        variant="neutral"
+                        icon-name="utility:case"
+                        onclick={handleOpenRequest}
+                        disabled={noRelatedRequest}
+                    ></lightning-button>
+                    <lightning-button
+                        label="Rafraîchir"
+                        variant="neutral"
+                        icon-name="utility:refresh"
+                        onclick={handleRefresh}
+                        disabled={isWorking}
+                    ></lightning-button>
+                </div>
+            </div>
+
+            <template if:true={hasWarning}>
+                <div class="warning-panel">
+                    <lightning-icon icon-name="utility:warning" size="small" variant="warning"></lightning-icon>
+                    <span>{warning}</span>
+                </div>
+            </template>
+
+            <template if:true={hasScenarios}>
+                <section class="scenario-grid">
+                    <template for:each={scenarios} for:item="scenario">
+                        <article class={scenario.cardClass} key={scenario.id}>
+                            <div class="scenario-top">
+                                <div class="rank">#{scenario.displayRank}</div>
+                                <div class="scenario-title">
+                                    <h2>{scenario.name}</h2>
+                                    <p>{scenario.scenarioType}</p>
+                                </div>
+                                <div class="score-box">
+                                    <span>Score</span>
+                                    <strong>
+                                        <lightning-formatted-number
+                                            value={scenario.totalScore}
+                                            maximum-fraction-digits="1"
+                                        ></lightning-formatted-number>
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="scenario-badges">
+                                <template if:true={scenario.selected}>
+                                    <span class="badge badge-success">Sélectionné</span>
+                                </template>
+                                <template if:true={scenario.stale}>
+                                    <span class="badge badge-warning">Données &gt; 24 h</span>
+                                </template>
+                                <span class="badge badge-neutral">
+                                    Version {scenario.scoreVersion}
+                                </span>
+                            </div>
+
+                            <div class="scenario-details">
+                                <div>
+                                    <span>Produit</span>
+                                    <strong>{scenario.productCode} · {scenario.productName}</strong>
+                                </div>
+                                <div>
+                                    <span>Quantité</span>
+                                    <strong>{scenario.quantity}</strong>
+                                </div>
+                                <div>
+                                    <span>Entrepôt</span>
+                                    <strong>{scenario.warehouseName} ({scenario.warehouseCode})</strong>
+                                </div>
+                                <div>
+                                    <span>Livraison estimée</span>
+                                    <strong>
+                                        <lightning-formatted-date-time
+                                            value={scenario.estimatedDeliveryDate}
+                                            year="numeric"
+                                            month="2-digit"
+                                            day="2-digit"
+                                        ></lightning-formatted-date-time>
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>Fraîcheur</span>
+                                    <strong>
+                                        <lightning-formatted-date-time
+                                            value={scenario.dataFreshness}
+                                            year="numeric"
+                                            month="2-digit"
+                                            day="2-digit"
+                                            hour="2-digit"
+                                            minute="2-digit"
+                                        ></lightning-formatted-date-time>
+                                    </strong>
+                                </div>
+                                <template if:true={scenario.estimatedMargin}>
+                                    <div>
+                                        <span>Marge estimée</span>
+                                        <strong>{scenario.estimatedMargin} %</strong>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="factors">
+                                <template for:each={scenario.factors} for:item="factor">
+                                    <div class="factor" key={factor.label}>
+                                        <div class="factor-label">
+                                            <span>{factor.label}</span>
+                                            <span>{factor.weightLabel}</span>
+                                        </div>
+                                        <lightning-progress-bar
+                                            value={factor.value}
+                                            size="small"
+                                        ></lightning-progress-bar>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="explanation">
+                                <p>{scenario.explanation}</p>
+                                <template if:true={scenario.assumptions}>
+                                    <details>
+                                        <summary>Hypothèses</summary>
+                                        <p>{scenario.assumptions}</p>
+                                    </details>
+                                </template>
+                            </div>
+
+                            <template if:true={scenario.decisionComment}>
+                                <div class="decision-note">
+                                    <strong>Commentaire de décision</strong>
+                                    <p>{scenario.decisionComment}</p>
+                                    <small>
+                                        {scenario.decisionBy}
+                                        <template if:true={scenario.decisionDate}>
+                                            ·
+                                            <lightning-formatted-date-time
+                                                value={scenario.decisionDate}
+                                                year="numeric"
+                                                month="2-digit"
+                                                day="2-digit"
+                                                hour="2-digit"
+                                                minute="2-digit"
+                                            ></lightning-formatted-date-time>
+                                        </template>
+                                    </small>
+                                </div>
+                            </template>
+
+                            <template if:true={scenario.rejectionReason}>
+                                <div class="rejection-note">
+                                    <strong>Motif de rejet</strong>
+                                    <p>{scenario.rejectionReason}</p>
+                                </div>
+                            </template>
+
+                            <div class="scenario-actions">
+                                <template if:false={scenario.selected}>
+                                    <lightning-button
+                                        label="Sélectionner"
+                                        variant="brand"
+                                        icon-name="utility:check"
+                                        data-id={scenario.id}
+                                        data-name={scenario.name}
+                                        onclick={handleSelectClick}
+                                    ></lightning-button>
+                                    <lightning-button
+                                        label="Rejeter"
+                                        variant="destructive-text"
+                                        data-id={scenario.id}
+                                        data-name={scenario.name}
+                                        onclick={handleRejectClick}
+                                    ></lightning-button>
+                                </template>
+                                <template if:true={scenario.selected}>
+                                    <span class="selected-label">
+                                        <lightning-icon
+                                            icon-name="utility:success"
+                                            size="x-small"
+                                            variant="success"
+                                        ></lightning-icon>
+                                        Décision retenue
+                                    </span>
+                                </template>
+                            </div>
+                        </article>
+                    </template>
+                </section>
+            </template>
+
+            <template if:false={hasScenarios}>
+                <div class="empty-state">
+                    <lightning-icon icon-name="utility:info" size="small"></lightning-icon>
+                    <div>
+                        <strong>Aucun scénario enregistré.</strong>
+                        <p>Vérifie que Flow 2 a bien créé les scénarios à partir du stock.</p>
+                    </div>
+                </div>
+            </template>
+
+            <template if:true={showSelectPanel}>
+                <section class="decision-panel">
+                    <h2>Sélectionner {pendingScenarioName}</h2>
+                    <p>
+                        La décision sera horodatée et attribuée à ton utilisateur. Les autres
+                        scénarios de cette opportunité seront désélectionnés.
+                    </p>
+                    <lightning-textarea
+                        label="Commentaire de décision"
+                        value={decisionComment}
+                        onchange={handleCommentChange}
+                        maxlength="1000"
+                        required
+                    ></lightning-textarea>
+                    <div class="decision-actions">
+                        <lightning-button
+                            label="Confirmer la sélection"
+                            variant="brand"
+                            onclick={handleConfirmSelect}
+                            disabled={selectDisabled}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Annuler"
+                            variant="neutral"
+                            onclick={handleCancel}
+                        ></lightning-button>
+                    </div>
+                </section>
+            </template>
+
+            <template if:true={showRejectPanel}>
+                <section class="decision-panel">
+                    <h2>Rejeter {pendingScenarioName}</h2>
+                    <p>Le motif de rejet sera conservé pour l’audit et le reporting.</p>
+                    <lightning-textarea
+                        label="Motif de rejet"
+                        value={rejectionReason}
+                        onchange={handleReasonChange}
+                        maxlength="1000"
+                        required
+                    ></lightning-textarea>
+                    <div class="decision-actions">
+                        <lightning-button
+                            label="Confirmer le rejet"
+                            variant="destructive"
+                            onclick={handleConfirmReject}
+                            disabled={rejectDisabled}
+                        ></lightning-button>
+                        <lightning-button
+                            label="Annuler"
+                            variant="neutral"
+                            onclick={handleCancel}
+                        ></lightning-button>
+                    </div>
+                </section>
+            </template>
+        </template>
+    </div>
+</template>
