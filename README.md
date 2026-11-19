@@ -10,7 +10,7 @@ Les entreprises enregistrent leurs opportunités dans un CRM, mais leur priorisa
 
 **SmartDeal Impact** est un copilote commercial intelligent construit nativement sur Salesforce. Il centralise les données, contrôle la qualité des demandes, calcule un score déterministe et configurable, déclenche les bonnes actions et accompagne le commercial avec Agentforce — sans jamais remplacer sa décision finale.
 
-Le dépôt contient l’implémentation Salesforce DX du démonstrateur **SmartDeal Order Rescue**, qui couvre le cœur du parcours : qualification d’une demande client, contrôle de faisabilité stock, génération de scénarios de sauvetage, scoring explicable, décision humaine et handoff vers une équipe de service.
+Le dépôt contient l’implémentation Salesforce DX du démonstrateur **SmartDeal Order Rescue**, qui couvre le cœur du parcours : qualification d’une demande client, contrôle de faisabilité stock, génération de scénarios de sauvetage, scoring explicable, décision humaine et préparation du handoff vers une équipe de service.
 
 ---
 
@@ -25,7 +25,7 @@ SmartDeal Impact répond à trois questions :
 Le projet repose sur une architecture hybride d’IA responsable :
 
 - **Apex** calcule un score déterministe, versionné et explicable ;
-- **Salesforce Flow** orchestre la validation, les tâches, les scénarios et le handoff ;
+- **Salesforce Flow** orchestre la validation, les tâches et les scénarios ; le handoff est conçu mais pas encore automatisé ;
 - **Agentforce** explique les résultats, contextualise et recommande la prochaine action ;
 - **le commercial** conserve la validation finale ;
 - **Salesforce CRM** reste la source de vérité pour les données, les décisions et l’audit.
@@ -65,8 +65,10 @@ Le dépôt est un projet Salesforce DX qui contient :
 
 - les objets personnalisés et leurs champs ;
 - les règles de validation ;
-- les services Apex ;
+- les services Apex et les contrôleurs LWC ;
 - les actions invocables pour Salesforce Flow et Agentforce ;
+- les flows Salesforce ;
+- les composants Lightning Web Components ;
 - les tests Apex ;
 - les scripts de démonstration ;
 - la documentation Agentforce ;
@@ -82,26 +84,26 @@ Le dépôt est un projet Salesforce DX qui contient :
 | Génération et stockage de scénarios de sauvetage | Implémenté |
 | Scoring Apex déterministe et configurable | Implémenté |
 | Classement des scénarios pour Agentforce | Implémenté |
-| Action de handoff Agentforce | Conçu, à configurer dans l’org |
-| Flows Salesforce | Conçus, à recréer/configurer dans l’org |
-| Interface Lightning | Couche Apex disponible ; composants LWC à construire |
-| Tableaux de bord | À construire |
+| Flows Salesforce | 3 flows versionnés et actifs ; Flow 4 non créé |
+| Interface Lightning | 4 LWC versionnés et déployés |
+| Contrôleurs Apex pour l’interface | Implémentés (cockpit, workspace, board, reporting) |
+| Action de handoff Agentforce | Conçue, non créée |
+| Tableaux de bord standard | Non versionnés ; reporting LWC disponible |
 | Intégration ERP réelle | Adaptateur Apex présent ; Named Credential à configurer |
 
-### 3.2 Ce qui n’est pas encore versionné dans le dépôt
+### 3.2 Ce qui reste à configurer ou à versionner
 
-Les éléments suivants ne sont pas présents sous forme de metadata dans `force-app` :
+Les éléments suivants ne sont pas encore présents sous forme de metadata dans `force-app` :
 
-- les flows ;
-- les permission sets ;
-- les profils ;
-- les composants LWC/Aura ;
-- les tableaux de bord et rapports ;
-- la configuration de l’agent Agentforce ;
+- le Flow 4 `SD_Agentforce_Handoff` ;
+- le Flow after-save `SD_Scenario_Decision_Followup` ;
+- les permission sets et profils ;
+- les rapports et dashboards standard ;
+- la configuration de l’agent Agentforce dans l’org ;
 - la Named Credential `SmartDeal_ERP` ;
 - les champs personnalisés de `Opportunity` et `Product2` utilisés par les scripts.
 
-Ils doivent être configurés dans l’org ou ajoutés au dépôt dans une prochaine étape.
+Les flows 1 à 3 et les quatre composants LWC sont désormais versionnés dans `force-app/main/default`.
 
 ---
 
@@ -117,8 +119,9 @@ flowchart LR
     E -->|Stock insuffisant| G[Scenarios de sauvetage]
     G --> H[Scoring Apex]
     H --> I[Agentforce - classement et explication]
-    I --> J[Flow 3 - Decision humaine]
-    J --> K[Flow 4 - Handoff Service Request]
+    I --> J[Flow 3 simplifié - horodatage before-save]
+    J --> K[LWC / Apex - sélection complète et mise à jour Opportunity]
+    K -.-> L[Flow 4 - Handoff Service Request - non créé]
 ```
 
 ### Étape 1 — Captation de la demande
@@ -248,7 +251,7 @@ Agentforce utilise ces données pour expliquer et recommander une prochaine acti
 
 ### Étape 7 — Décision humaine
 
-Le commercial sélectionne un scénario. La décision enregistre :
+Le commercial sélectionne un scénario depuis le LWC `smartDealScenarioBoard`. La décision enregistre :
 
 - `Selected__c` ;
 - `Decision_By__c` ;
@@ -257,11 +260,11 @@ Le commercial sélectionne un scénario. La décision enregistre :
 
 La règle `SD_RS_Selected_Requires_Decision` impose un utilisateur et une date de décision lorsqu’un scénario est sélectionné.
 
-Les autres scénarios de la même opportunité sont désélectionnés. La validation finale reste humaine.
+Le Flow 3 `SD_Scenario_Decision` est un flow **before-save** simplifié : il horodate la décision. La sélection complète est gérée par `SmartDealScenarioController.selectScenario()` : désélection des autres scénarios, sélection du scénario choisi, puis passage de l’Opportunité à `Rescued` avec `Rescue_Required__c = false`. La validation finale reste humaine.
 
 ### Étape 8 — Handoff vers le service
 
-Le flow de handoff peut créer une `Service_Request__c` pour une revue humaine :
+Le Flow 4 `SD_Agentforce_Handoff` n’est pas encore créé. Sa cible fonctionnelle est de créer une `Service_Request__c` pour une revue humaine :
 
 - catégorie `Order Rescue` ;
 - priorité ;
@@ -316,11 +319,11 @@ flowchart TB
 |---|---|
 | Objets Salesforce | Stockage des demandes, stocks, scénarios, décisions et tickets |
 | Règles de validation | Garantie d’intégrité des données |
-| Flows | Orchestration métier, tâches, décisions, handoff |
-| Apex | Calcul, lecture sécurisée, actions invocables |
-| Agentforce | Explication, contexte, recommandation, handoff |
-| Lightning | Interface utilisateur et pilotage |
-| Dashboards | Suivi des KPI et des résultats |
+| Flows | Orchestration métier, tâches, décisions ; handoff ciblé via Flow 4 |
+| Apex | Calcul, lecture sécurisée, actions invocables, contrôleurs LWC |
+| Agentforce | Explication, contexte, recommandation, handoff ciblé |
+| Lightning | 4 LWC : cockpit, demande, board scénarios, reporting |
+| Dashboards | KPI dans le LWC de reporting ; dashboards standard à créer |
 
 ---
 
@@ -544,6 +547,10 @@ Le projet suppose que l’org contient déjà :
 | `SmartDealErpClient` | Client HTTP | Adaptateur ERP via Named Credential |
 | `ServiceRequestService` | Service métier | Requêtes, assignation, escalade |
 | `ServiceRequestController` | Contrôleur Aura | Lecture des demandes pour UI |
+| `SmartDealCockpitController` | Contrôleur LWC | KPI, file de travail et décisions récentes |
+| `SmartDealRequestWorkspaceController` | Contrôleur LWC | Checklist, inventaire et validation d’une demande |
+| `SmartDealScenarioController` | Contrôleur LWC | Board scénarios, sélection et rejet |
+| `SmartDealReportingController` | Contrôleur LWC | Agrégats du reporting opérationnel |
 
 ### 8.1 `SmartDealScoringService`
 
@@ -639,19 +646,30 @@ Fonctions :
 
 Toutes les lectures utilisent `WITH USER_MODE`. Les mises à jour utilisent `AccessLevel.USER_MODE`.
 
+### 8.7 Contrôleurs de l’interface Lightning
+
+| Contrôleur | Méthodes | Rôle |
+|---|---|---|
+| `SmartDealCockpitController` | `getCockpit()` | Compteurs, file de travail priorisée, décisions récentes |
+| `SmartDealRequestWorkspaceController` | `getWorkspace()`, `validateRequest()` | Checklist, inventaire, validation de la demande |
+| `SmartDealScenarioController` | `getBoard()`, `selectScenario()`, `rejectScenario()` | Comparaison des scénarios et décision humaine |
+| `SmartDealReportingController` | `getDashboard()` | Demandes, opportunités, scénarios, service et funnel |
+
+Les méthodes de lecture sont `@AuraEnabled(cacheable=true)`. Les méthodes d’écriture utilisent `AccessLevel.USER_MODE`.
+
 ---
 
 ## 9. Flows Salesforce
 
-Les flows ne sont pas versionnés dans le dépôt. Ils sont décrits ci-dessous pour être recréés dans l’org.
+Les flows sont versionnés dans `force-app/main/default/flows`. Trois flows sont actifs dans l’org.
 
-| Flow | Type | Déclencheur | Rôle |
-|---|---|---|---|
-| `SD_Request_Intake_Validation` | Record-triggered | Création/mise à jour de `Customer_Request__c` | Complétude, statut, tâches |
-| `SD_Check_Feasibility_Rescue` | Record-triggered | Passage à `Validated` | Vérifie le stock et crée les scénarios |
-| `SD_Scenario_Decision` | Before-save | `Selected__c = true` | Horodate la décision |
-| `SD_Scenario_Decision_Followup` | After-save | Nouvelle sélection | Désélectionne les autres, crée la tâche |
-| `SD_Agentforce_Handoff` | Autolaunched | Action Agentforce | Crée une Service Request et une interaction |
+| Flow | Type | Déclencheur | Statut | Rôle |
+|---|---|---|---|---|
+| `SD_Request_Intake_Validation` | Record-triggered | Création/mise à jour de `Customer_Request__c` | Actif | Complétude, statut, tâches |
+| `SD_Check_Feasibility_Rescue` | Record-triggered | Passage à `Validated` | Actif | Vérifie le stock et crée les scénarios |
+| `SD_Scenario_Decision` | Before-save | `Selected__c = true` | Actif, simplifié | Horodate la décision |
+| `SD_Scenario_Decision_Followup` | After-save | Nouvelle sélection | Non créé | Désélectionner les autres et créer la tâche |
+| `SD_Agentforce_Handoff` | Autolaunched | Action Agentforce | Non créé | Créer une Service Request et une interaction |
 
 ### 9.1 `SD_Request_Intake_Validation`
 
@@ -673,25 +691,34 @@ Les flows ne sont pas versionnés dans le dépôt. Ils sont décrits ci-dessous 
 
 ### 9.3 `SD_Scenario_Decision`
 
-Flow before-save pour respecter `SD_RS_Selected_Requires_Decision`.
+Flow before-save simplifié pour respecter `SD_RS_Selected_Requires_Decision`.
 
 - Si `Selected__c = true` et que la décision est nouvelle ou incomplète :
   - `Decision_By__c = $User.Id` ;
   - `Decision_Date__c = NOW()`.
+- Le flow ne désélectionne pas les autres scénarios.
+- Le flow ne crée pas de tâche.
+- Le flow ne modifie pas l’Opportunité.
+
+La sélection complète est assurée par `SmartDealScenarioController.selectScenario()` et le LWC `smartDealScenarioBoard`.
 
 ### 9.4 `SD_Scenario_Decision_Followup`
 
-Flow after-save.
+Flow after-save **non créé** dans l’org actuelle.
 
-- Si le scénario vient d’être sélectionné :
-  - récupère les autres scénarios sélectionnés de la même opportunité ;
-  - les désélectionne ;
-  - crée une tâche liée à l’opportunité ;
-  - peut passer `Opportunity.Feasibility_Status__c` à `Rescued` et `Rescue_Required__c` à `false`.
+Cible fonctionnelle :
+
+- si le scénario vient d’être sélectionné :
+  - récupérer les autres scénarios sélectionnés de la même opportunité ;
+  - les désélectionner ;
+  - créer une tâche liée à l’opportunité ;
+  - passer `Opportunity.Feasibility_Status__c` à `Rescued` et `Rescue_Required__c` à `false`.
+
+En attendant, ce comportement est porté par le contrôleur Apex du board.
 
 ### 9.5 `SD_Agentforce_Handoff`
 
-Flow autolaunché appelé par Agentforce.
+Flow autolaunché **non créé** dans l’org actuelle. Il est décrit ci-dessous comme cible d’implémentation.
 
 Entrées :
 
@@ -731,7 +758,7 @@ Il peut :
 - expliquer un score et ses facteurs ;
 - préserver l’ordre, les scores et la version ;
 - recommander une prochaine action humaine ;
-- créer un handoff de service si l’action est configurée.
+- créer un handoff de service lorsque le Flow 4 sera créé et configuré comme action.
 
 Il ne peut pas :
 
@@ -750,7 +777,7 @@ Il ne peut pas :
 |---|---|---|---|
 | `Get Ranked SmartDeal Rescue Scenarios` | Apex invocable | Non | Implémentée |
 | `Check SmartDeal Inventory` | Apex invocable | Non | Implémentée, non enregistrée par défaut dans l’agent |
-| `Create SmartDeal Human Handoff` | Flow | Oui, Service Request + interaction | Conçue, à configurer |
+| `Create SmartDeal Human Handoff` | Flow | Oui, Service Request + interaction | Conçue, Flow 4 non créé |
 
 ### 10.3 Règles Agentforce
 
@@ -798,43 +825,44 @@ Le scénario `ALT` peut être sélectionné humainement après revue de compatib
 
 Le dépôt contient :
 
-- `ServiceRequestController` avec une méthode `@AuraEnabled(cacheable=true)` ;
-- les objets et les données nécessaires à une interface ;
-- des list views standard sur plusieurs objets.
+- 4 composants LWC versionnés et déployés :
+  - `smartDealCockpit` ;
+  - `smartDealRequestWorkspace` ;
+  - `smartDealScenarioBoard` ;
+  - `smartDealReporting` ;
+- 4 contrôleurs Apex dédiés à l’interface ;
+- des pages Lightning à activer dans l’org ;
+- des list views standard sur plusieurs objets ;
+- aucun rapport ou dashboard standard versionné.
 
-Le dépôt ne contient pas encore :
+### 11.2 Composants LWC et emplacements
 
-- de composant LWC ou Aura ;
-- de page Lightning dédiée ;
-- de tableau de bord ;
-- de rapport versionné.
+| Composant | Cible | Emplacement Salesforce | Rôle |
+|---|---|---|---|
+| `smartDealCockpit` | `lightning__Tab`, `lightning__AppPage`, `lightning__HomePage` | Onglet Cockpit | KPI, file de travail, décisions récentes |
+| `smartDealRequestWorkspace` | `lightning__RecordPage` sur `Customer_Request__c` | Page d’enregistrement Customer Request | Checklist, inventaire, validation |
+| `smartDealScenarioBoard` | `lightning__RecordPage` sur `Opportunity` | Page d’enregistrement Opportunity | Comparaison et sélection des scénarios |
+| `smartDealReporting` | `lightning__Tab`, `lightning__AppPage`, `lightning__HomePage` | Onglet Reporting | Funnel, volumes, priorités service |
 
-### 11.2 Cible fonctionnelle
+### 11.3 Activation de l’interface
 
-L’interface cible doit permettre :
+1. **Cockpit** : Setup → User Interface → Tabs → Lightning Component Tabs → New → `smartDealCockpit`.
+2. **Reporting** : même chemin avec `smartDealReporting`.
+3. **Workspace** : Setup → Object Manager → Customer Request → Lightning Record Pages → New → `SmartDeal Request Workspace` → glisser `smartDealRequestWorkspace` dans la région principale → Save → Activation → Org Default.
+4. **Board** : Setup → Object Manager → Opportunity → Lightning Record Pages → New → `SmartDeal Scenario Board` → glisser `smartDealScenarioBoard` dans la région principale → Save → Activation → Org Default.
+5. Ajouter les onglets `Cockpit` et `Reporting` à l’application `SmartDeal Impact` via App Manager → Navigation Items.
 
-- de consulter les demandes à traiter ;
-- de voir le score et son explication ;
-- de comparer les scénarios ;
-- de sélectionner un scénario avec commentaire ;
-- de visualiser les tâches et relances ;
-- de suivre les SLA ;
-- de créer un handoff de service ;
-- d’accéder aux KPI.
+### 11.4 KPI disponibles dans le reporting
 
-### 11.3 KPI recommandés
-
-- Nombre d’opportunités sans prochaine action.
-- Délai moyen avant première relance.
-- Taux de demandes complètes du premier coup.
-- Taux de demandes en `Needs Review`.
-- Taux d’opportunités sauvées par scénario.
-- Répartition des scores.
-- Taux de scénarios sélectionnés.
-- Respect des SLA de service.
-- Nombre de handoffs par catégorie et priorité.
-- Taux de conversion et causes de perte.
-- Valeur des opportunités perdues par retard de relance.
+- Demandes validées et demandes à traiter.
+- Opportunités `At Risk`, `Feasible` et `Rescued`.
+- Scénarios générés et sélectionnés.
+- Taux de validation et taux de sélection.
+- Score moyen des scénarios sélectionnés.
+- Demandes service ouvertes et en retard SLA.
+- Funnel demandes → validées → à risque → scénarios → sélection.
+- Répartition des types de scénarios.
+- Répartition des priorités service.
 
 ---
 
@@ -846,7 +874,7 @@ L’interface cible doit permettre :
 - Aucun secret n’est stocké dans le dépôt.
 - L’intégration ERP doit utiliser une Named Credential.
 - Les scripts de démonstration sont réservés aux administrateurs.
-- Les actions Agentforce sont en lecture seule, sauf le handoff explicite.
+- Les actions Agentforce sont en lecture seule, sauf le handoff explicite lorsqu’il sera implémenté.
 - L’agent ne doit jamais exposer de données inaccessibles.
 - Le score est calculé par des règles vérifiables, pas généré par l’IA.
 - L’humain conserve la décision finale.
@@ -885,10 +913,30 @@ Les scripts créent ou mettent à jour uniquement les lignes marquées `SD_CONTI
 
 ### Scénarios Atlas
 
-| Scénario | Type | Produit | Quantité | Entrepôt | Score |
-|---|---|---|---:|---|---:|
-| `ALT` | Reconditionné | `PE-R100` | 10 | Demo Agadir | 84,00 |
-| `PARTIAL` | Livraison partielle | `PP-X100` | 4 | Demo Casa | 63,50 |
+L’org de démonstration contient cinq scénarios Atlas. Les scripts `01_prepare_demo` et `04_select_atlas_alternative` pilotent les deux scénarios marqués `SD_CONTINUATION_DEMO|ATLAS|ALT` et `SD_CONTINUATION_DEMO|ATLAS|PARTIAL`. Les trois autres scénarios existants sont conservés.
+
+| Scénario | Type | Produit | Quantité | Entrepôt | Score | Sélectionné |
+|---|---|---|---|---:|---|---:|---|
+| `RS-0001` | Scénario existant | — | — | — | 94,00 | Non |
+| `RS-0002` | Scénario existant | — | — | — | 81,75 | Non |
+| `RS-0003` | Scénario existant | — | — | — | 66,75 | Non |
+| `RS-0004` | Alternative démo | `PE-R100` | 10 | Demo Agadir | 84,00 | Oui |
+| `RS-0005` | Livraison partielle | `PP-X100` | 4 | Demo Casa | 63,50 | Non |
+
+État de l’org au dernier contrôle :
+
+- Atlas `Feasibility_Status__c = Rescued` ;
+- `RS-0004` sélectionné ;
+- EduNova `At Risk` sans scénario ;
+- GreenBuild `Feasible`.
+
+Pour rejouer la démonstration depuis zéro :
+
+```powershell
+sf apex run --file scripts/apex/05_reset_atlas_demo.apex --target-org smartdeal-dev
+```
+
+Ce script remet Atlas en `At Risk` et désélectionne tous ses scénarios.
 
 ---
 
@@ -930,6 +978,19 @@ Le script vérifie :
 - la configuration `Default_v1` ;
 - la présence des trois opportunités.
 
+Dernier déploiement de référence :
+
+- Deploy ID : `0Affj00000a24nZCAQ` ;
+- statut : `Succeeded` ;
+- composants déployés : `136/136`.
+
+Dernier contrôle de l’interface :
+
+- Cockpit : `6` éléments en file, `1` décision récente.
+- Reporting : `6` demandes, `5` validées, `5` scénarios.
+- Workspace `CR-0004` : inventaire `AT_RISK`, `7` contrôles, `2` entrepôts.
+- Board Atlas : `5` scénarios, `1` sélectionné, avertissement de fraîcheur sur `3` scénarios.
+
 ### 14.4 Configuration du scoring
 
 Créer `SmartDeal_Weight__mdt.Default_v1` avec :
@@ -950,20 +1011,39 @@ Les poids doivent être entre 0 et 1 et leur somme doit être égale à 1.
 
 ### 14.5 Configuration des flows
 
-Recréer les flows décrits en section 9 dans Salesforce Flow Builder, puis les activer dans cet ordre :
+Les flows versionnés sont déjà présents dans `force-app/main/default/flows`. Ils sont actifs dans l’org de démonstration :
 
 1. `SD_Request_Intake_Validation`
 2. `SD_Check_Feasibility_Rescue`
-3. `SD_Scenario_Decision`
+3. `SD_Scenario_Decision` (before-save simplifié)
+
+Les flows suivants restent à créer :
+
 4. `SD_Scenario_Decision_Followup`
 5. `SD_Agentforce_Handoff`
 
-### 14.6 Configuration Agentforce
+### 14.6 Configuration de l’interface Lightning
+
+Après déploiement :
+
+```powershell
+sf project deploy start --source-dir force-app --target-org smartdeal-dev --test-level NoTestRun
+```
+
+1. Créer les onglets Lightning Component `Cockpit` et `Reporting`.
+2. Créer l’application `SmartDeal Impact`.
+3. Ajouter les onglets à l’application.
+4. Créer la page d’enregistrement `Customer Request` avec `smartDealRequestWorkspace`.
+5. Créer la page d’enregistrement `Opportunity` avec `smartDealScenarioBoard`.
+6. Activer chaque page en `Org Default`.
+7. Ouvrir `CR-0004` pour le workspace et `Atlas Office - 10 imprimantes` pour le board.
+
+### 14.7 Configuration Agentforce
 
 1. Ouvrir Agent Builder.
 2. Ajouter l’action Apex `Get Ranked SmartDeal Rescue Scenarios`.
 3. Ajouter éventuellement `Check SmartDeal Inventory`.
-4. Ajouter le flow `SD_Agentforce_Handoff` comme action de handoff.
+4. Créer le Flow 4 `SD_Agentforce_Handoff`, puis l’ajouter comme action de handoff.
 5. Vérifier les permissions de l’utilisateur d’exécution.
 6. Mettre à jour les instructions avec `docs/Agent_Instructions_EN.txt`.
 
@@ -991,8 +1071,10 @@ Crée ou met à jour :
 
 - 4 lignes de stock ;
 - 3 demandes validées ;
-- 2 scénarios Atlas ;
+- 2 scénarios Atlas marqués démo ;
 - remet à zéro les décisions de démonstration.
+
+Les scénarios Atlas supplémentaires déjà présents dans l’org ne sont pas supprimés.
 
 ### 02 — Vérifier le stock
 
@@ -1029,6 +1111,19 @@ Le script :
 - marque l’opportunité Atlas comme `Rescued`.
 
 Aucune réservation, commande, offre ou communication client n’est créée.
+
+### 05 — Réinitialiser Atlas pour rejouer la démo
+
+```powershell
+sf apex run --file scripts/apex/05_reset_atlas_demo.apex --target-org smartdeal-dev
+```
+
+Le script :
+
+- repasse Atlas en `At Risk` ;
+- remet `Rescue_Required__c = true` ;
+- désélectionne tous les scénarios Atlas ;
+- efface les dates, utilisateurs, commentaires et motifs de rejet.
 
 ---
 
@@ -1075,7 +1170,15 @@ npm run prettier:verify
 npm run lint
 ```
 
-`npm run lint` cible les composants Aura/LWC. Il n’y a pas encore de composants LWC dans le dépôt.
+`npm run lint` cible désormais les composants LWC du dépôt : `smartDealCockpit`, `smartDealRequestWorkspace`, `smartDealScenarioBoard` et `smartDealReporting`.
+
+Tests Apex ciblés pour l’interface :
+
+```powershell
+sf apex run test --target-org smartdeal-dev --tests ServiceRequestServiceTest --wait 10
+```
+
+Les contrôleurs LWC s’appuient sur les services et actions déjà testés. Il n’existe pas encore de tests Apex dédiés aux quatre contrôleurs d’interface ni de tests Jest pour les LWC.
 
 ---
 
@@ -1088,7 +1191,10 @@ npm run lint
 - Les snapshots de stock de plus de 24 h sont refusés.
 - Un budget manquant est bloquant.
 - Un score élevé ne prouve pas la compatibilité produit, la quantité complète, la réservation ou l’accord client.
-- Les flows, permission sets, composants Lightning, rapports et dashboards ne sont pas versionnés.
+- Les flows 1 à 3 et les 4 composants LWC sont versionnés. Le Flow 4, le flow after-save, les permission sets, les rapports/dashboards et la configuration Agentforce ne sont pas versionnés.
+- Le Flow 3 est simplifié : il horodate la décision mais ne désélectionne pas les autres scénarios et ne met pas à jour l’Opportunité. Ce comportement est porté par `SmartDealScenarioController`.
+- `Service_Request__c` n’a pas de lookup direct vers `Opportunity` ou `Rescue_Scenario__c` ; le reporting service n’est donc pas encore relié de bout en bout au parcours de sauvetage.
+- Dans l’org de démonstration actuelle, EduNova est `At Risk` mais ne possède aucun scénario ; utiliser Atlas pour la démonstration du board.
 - L’agent ne peut pas créer de commande, réserver du stock, créer un devis ou envoyer un message client.
 - Le scoring actuel porte sur les scénarios de sauvetage. Le scoring global de l’opportunité (maturité, engagement, potentiel, adéquation stratégique, fiabilité des données) reste à implémenter.
 - Le SLA de `Service_Request__c` dépend de la priorité, pas de `Service_Category__c.Default_SLA_Hours__c`.
@@ -1100,11 +1206,12 @@ npm run lint
 
 ### Phase 1 — Consolidation du socle
 
-- Versionner les flows dans `force-app/main/default/flows`.
-- Ajouter un permission set `SmartDeal_Agent_User`.
-- Ajouter les composants Lightning de consultation des demandes et scénarios.
-- Ajouter les rapports et dashboards.
+- Ajouter un permission set `SmartDeal_Agent_User` et les accès Apex/objets/champs nécessaires.
+- Ajouter le Flow 4 `SD_Agentforce_Handoff`.
+- Ajouter le flow after-save `SD_Scenario_Decision_Followup` si l’on veut sortir la logique du contrôleur Apex.
+- Ajouter les rapports et dashboards standard.
 - Ajouter une gestion d’erreurs et des fault paths dans les flows.
+- Ajouter des tests Apex dédiés aux contrôleurs LWC et des tests Jest pour les composants.
 
 ### Phase 2 — Scoring opportunité
 
@@ -1155,13 +1262,15 @@ smartdeal/
 ├── force-app/
 │   └── main/
 │       └── default/
-│           ├── classes/          Services, actions et tests Apex
+│           ├── classes/          Services, actions, contrôleurs LWC et tests Apex
+│           ├── flows/            3 flows versionnés
+│           ├── lwc/              4 composants Lightning Web Components
 │           └── objects/          Objets, champs et règles de validation
 ├── config/                       Configuration scratch org
 ├── docs/                         Instructions Agentforce
 ├── manifest/                     Manifest de déploiement partiel
 ├── scripts/
-│   ├── apex/                     Scripts de démonstration 00 à 04
+│   ├── apex/                     Scripts de démonstration 00 à 05
 │   └── soql/                     Exemples de requêtes
 ├── README.md
 ├── package.json
@@ -1210,9 +1319,36 @@ Vérifier :
 - que `Data_Freshness__c` a moins de 24 h ;
 - que la configuration est active.
 
+### Le composant LWC n’apparaît pas dans App Builder
+
+Vérifier :
+
+- que le déploiement a réussi :
+
+```powershell
+sf project deploy start --source-dir force-app --target-org smartdeal-dev --test-level NoTestRun
+```
+
+- que le composant est recherché avec son nom exact : `smartDealCockpit`, `smartDealRequestWorkspace`, `smartDealScenarioBoard` ou `smartDealReporting` ;
+- que la page cible correspond au composant : `Customer_Request__c` pour le workspace, `Opportunity` pour le board ;
+- que la page a bien été activée en `Org Default` ;
+- que l’utilisateur a accès aux classes Apex et aux objets/champs.
+
+### Le board affiche « Aucun scénario enregistré »
+
+Vérifier que l’Opportunité possède bien des `Rescue_Scenario__c`. Dans l’org de démonstration, utiliser `Atlas Office - 10 imprimantes` et non EduNova. Pour repartir d’un état propre :
+
+```powershell
+sf apex run --file scripts/apex/05_reset_atlas_demo.apex --target-org smartdeal-dev
+```
+
 ### La sélection d’un scénario échoue
 
-La règle `SD_RS_Selected_Requires_Decision` exige `Decision_By__c` et `Decision_Date__c`. Utiliser un flow before-save ou renseigner ces champs avant la sauvegarde.
+La règle `SD_RS_Selected_Requires_Decision` exige `Decision_By__c` et `Decision_Date__c`. Le Flow 3 before-save et `SmartDealScenarioController.selectScenario()` renseignent ces champs. Vérifier aussi que le commentaire de décision n’est pas vide et que l’utilisateur peut modifier `Rescue_Scenario__c` et `Opportunity`.
+
+### Le Flow 3 ne désélectionne pas les autres scénarios
+
+C’est le comportement attendu du Flow 3 simplifié. Utiliser le LWC `smartDealScenarioBoard` ou `SmartDealScenarioController.selectScenario()` pour la sélection complète.
 
 ### Le handoff échoue
 
@@ -1267,7 +1403,7 @@ SmartDeal Impact ne se limite pas à classer des opportunités par montant. Le p
 Le démonstrateur actuel couvre déjà la chaîne essentielle :
 
 ```text
-Demande client → Validation → Faisabilité stock → Scénarios → Score → Explication → Décision humaine → Handoff
+Demande client → Validation → Faisabilité stock → Scénarios → Score → Explication → Décision humaine → Handoff (cible)
 ```
 
-La prochaine étape consiste à étendre ce socle au scoring global de l’opportunité, aux relances intelligentes, à l’interface Lightning, aux dashboards et à une intégration ERP industrialisée — sans jamais retirer à l’humain la décision finale.
+Les quatre composants LWC donnent désormais une interface concrète au cockpit, à la demande, au board de scénarios et au reporting. La prochaine étape consiste à ajouter le Flow 4 de handoff, le permission set, les dashboards standard, les tests d’interface et une intégration ERP industrialisée — sans jamais retirer à l’humain la décision finale.
